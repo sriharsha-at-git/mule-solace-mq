@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:solace="http://www.mulesoft.org/schema/mule/solace"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/solace http://www.mulesoft.org/schema/mule/solace/current/mule-solace.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+	<global-property doc:name="Global Property"
+		doc:id="b1d35b81-1b5c-4e61-b8d5-0945288e783f" name="mule.env"
+		value="dev" />
+		
+	<configuration-properties
+		doc:name="Configuration properties"
+		doc:id="7a003477-1c6d-4cb5-8908-29bc0fa489f0"
+		file="properties/${mule.env}.properties" />
+
+	<solace:config name="Solace_PubSub__Connector_Config"
+		doc:name="Solace PubSub+ Connector Config"
+		doc:id="b6404837-6d82-4320-ad5e-824ae43f3b8b">
+		<solace:connection
+			clientUserName="${solace.userName}" password="${solace.password}"
+			msgVPN="${solace.messageVpn}" brokerHost="${solace.secure.smfHost}">
+			<solace:jcsmp-properties>
+				<solace:jcsmp-property
+					key="SUB_ACK_WINDOW_SIZE" value="100" />
+				<solace:jcsmp-property
+					key="CLIENT_CHANNEL_PROPERTIES.connectRetries" value="5" />
+			</solace:jcsmp-properties>
+		</solace:connection>
+	</solace:config>
+
+	
+
+	<flow name="solace-mqFlow1"
+		doc:id="fb31fd38-2b0e-4be2-b6bb-eb08b9ffba46">
+		<solace:queue-listener
+			doc:name="Guaranteed Endpoint Listener"
+			doc:id="b8b19fb5-4207-44a0-b6d1-e6c17d73cf5e"
+			config-ref="Solace_PubSub__Connector_Config" address="${solace.inboundQueueNameV2}" ackMode="MANUAL_CLIENT"/>
+		<logger level="INFO" doc:name="Logger" doc:id="0d52699a-9a7d-40a8-bc91-2776299c89ec" message='#["Msg received from queue [pub-goa-solace-jms] " ++ payload.^raw]'/>
+		<ee:transform doc:name="Transform Message" doc:id="f8f82ee3-53fd-4d15-8366-bded71dbfc2d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+input payload application/csv header=false
+output application/json
+var inutPayload = payload[0]
+---
+{
+    customerId: payload[0][0],
+    firstName: payload[0][1],
+    lastName: payload[0][2],
+    gender: payload[0][3],
+    dateOfBirth: payload[0][4],
+    mobile: payload[0][5],
+    phone: payload[0][6],
+    email: payload[0][7],
+    address: payload[0][8],
+    city: payload[0][9],
+    region: payload[0][10],
+    country: payload[0][11],
+    postalZip: payload[0][12],
+    emailSubscribed: payload[0][13],
+    smsSubscribed: payload[0][14]
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="ecb964e6-3650-43f1-9610-e6b7e8333ba5" message='#["Transformed to CSV = " ++ payload.^raw]'/>
+		<solace:publish doc:name="Publish" doc:id="b8518fcb-f459-4c02-9c39-02f07612ca49" config-ref="Solace_PubSub__Connector_Config" destination-type="QUEUE" address="${solace.outboundQueueNameV2}"/>
+	</flow>
+</mule>
